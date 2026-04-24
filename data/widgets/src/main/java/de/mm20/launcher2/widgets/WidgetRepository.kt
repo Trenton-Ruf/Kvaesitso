@@ -21,6 +21,8 @@ interface WidgetRepository: Backupable {
     fun delete(widget: Widget)
     fun set(widgets: List<Widget>, parentId: UUID? = null)
 
+    fun moveOutOfRow(widget: Widget, rowId: UUID, targetParentId: UUID?)
+
     fun exists(type: String): Flow<Boolean>
     fun count(type: String): Flow<Int>
 }
@@ -59,7 +61,12 @@ internal class WidgetRepositoryImpl(
     override fun delete(widget: Widget) {
         val dao = database.widgetDao()
         scope.launch {
-            dao.delete(widget.id)
+            database.withTransaction {
+                if (widget is RowWidget) {
+                    dao.deleteByParent(widget.id)
+                }
+                dao.delete(widget.id)
+            }
         }
     }
 
@@ -75,6 +82,49 @@ internal class WidgetRepositoryImpl(
                 dao.insert(widgets.mapIndexed { index, widget ->
                     widget.toDatabaseEntity(position = index, parentId = parentId)
                 })
+            }
+        }
+    }
+
+    override fun moveOutOfRow(widget: Widget, rowId: UUID, targetParentId: UUID?) {
+        val dao = database.widgetDao()
+        scope.launch {
+            database.withTransaction {
+                // Find the row widget to get its position
+                val rowEntity = dao.queryById(rowId) ?: return@withTransaction
+                val rowPosition = rowEntity.position
+
+                // Shift widgets in the target parent to make space
+                if (targetParentId == null) {
+                    dao.shiftRoot(rowPosition, 1)
+                } else {
+                    dao.shiftByParent(targetParentId, rowPosition, 1)
+                }
+
+                // Move the widget to the target parent at the row's position
+                val entity = widget.toDatabaseEntity(position = rowPosition, parentId = targetParentId)
+                dao.insert(entity)
+
+                // Delete the widget from the row
+                dao.delete(widget.id)
+
+                // Check if the row is now empty or has only one widget
+                // Note: queryByParent returns a Flow, so we might need a sync query or just count
+                val remainingCount = dao.countByParent(rowId)
+                if (remainingCount <= 1) {
+                    // If one left, move it out too and delete row
+                    if (remainingCount == 1) {
+                        val lastWidgetEntity = dao.queryByParentSync(rowId).first()
+                        val lastWidget = Widget.fromDatabaseEntity(lastWidgetEntity)
+                        if (lastWidget != null) {
+                            // Move last widget to position after the one we just moved
+                            val lastWidgetTargetEntity = lastWidget.toDatabaseEntity(position = rowPosition + 1, parentId = targetParentId)
+                            dao.insert(lastWidgetTargetEntity)
+                            dao.delete(lastWidget.id)
+                        }
+                    }
+                    dao.delete(rowId)
+                }
             }
         }
     }

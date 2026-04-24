@@ -67,10 +67,31 @@ sealed class Widget {
                             ?: NotesWidgetConfig()
                     NotesWidget(entity.id, config)
                 }
+                RowWidget.Type -> RowWidget(entity.id)
 
                 else -> null
             }
         }
+    }
+}
+
+data class RowWidget(
+    override val id: UUID,
+) : Widget() {
+    override fun getLabel(context: Context): String {
+        return context.getString(R.string.widget_name_row)
+    }
+
+    override fun toDatabaseEntity(): PartialWidgetEntity {
+        return PartialWidgetEntity(
+            id = id,
+            type = Type,
+            config = null,
+        )
+    }
+
+    companion object {
+        const val Type = "row"
     }
 }
 

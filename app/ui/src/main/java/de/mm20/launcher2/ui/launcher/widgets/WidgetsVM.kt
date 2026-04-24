@@ -6,6 +6,7 @@ import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import de.mm20.launcher2.preferences.ui.UiSettings
+import de.mm20.launcher2.widgets.RowWidget
 import de.mm20.launcher2.widgets.Widget
 import de.mm20.launcher2.widgets.WidgetRepository
 import kotlinx.coroutines.flow.SharingStarted
@@ -57,6 +58,21 @@ class WidgetsVM(
         val widget = widgets.removeAt(index)
         widgets.add(index + 1, widget)
         widgetRepository.set(widgets, parentId)
+    }
+
+    fun combineIntoRow(originalWidget: Widget, newWidget: Widget) {
+        val widgets = widgets.value.toMutableList()
+        val index = widgets.indexOfFirst { it.id == originalWidget.id }
+        if (index == -1) return
+
+        val rowWidget = RowWidget(UUID.randomUUID())
+        widgets[index] = rowWidget
+        widgetRepository.set(widgets, parentId)
+        widgetRepository.set(listOf(originalWidget, newWidget), rowWidget.id)
+    }
+
+    fun removeFromRow(widget: Widget, rowId: UUID, targetParentId: UUID?) {
+        widgetRepository.moveOutOfRow(widget, rowId, targetParentId)
     }
 
     companion object : KoinComponent {

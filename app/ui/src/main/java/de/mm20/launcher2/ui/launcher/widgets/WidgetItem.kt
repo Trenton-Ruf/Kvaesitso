@@ -32,6 +32,7 @@ import androidx.compose.ui.zIndex
 import de.mm20.launcher2.ui.R
 import de.mm20.launcher2.ui.component.LauncherCard
 import de.mm20.launcher2.ui.launcher.sheets.ConfigureWidgetSheet
+import de.mm20.launcher2.ui.launcher.sheets.WidgetPickerSheet
 import de.mm20.launcher2.ui.launcher.widgets.calendar.CalendarWidget
 import de.mm20.launcher2.ui.launcher.widgets.external.AppWidget
 import de.mm20.launcher2.ui.launcher.widgets.favorites.AppsWidget
@@ -44,23 +45,32 @@ import de.mm20.launcher2.widgets.CalendarWidget
 import de.mm20.launcher2.widgets.AppsWidget
 import de.mm20.launcher2.widgets.MusicWidget
 import de.mm20.launcher2.widgets.NotesWidget
+import de.mm20.launcher2.widgets.RowWidget
 import de.mm20.launcher2.widgets.WeatherWidget
 import de.mm20.launcher2.widgets.Widget
+import java.util.UUID
 
 @Composable
 fun WidgetItem(
     widget: Widget,
     modifier: Modifier = Modifier,
     editMode: Boolean = false,
+    isInRow: Boolean = false,
+    parentId: UUID? = null,
     onWidgetAdd: (widget: Widget, offset: Int) -> Unit = { _, _ -> },
     onWidgetUpdate: (widget: Widget) -> Unit = {},
     onWidgetRemove: () -> Unit = {},
+    onAddToRow: (Widget) -> Unit = {},
+    onMoveLeft: () -> Unit = {},
+    onMoveRight: () -> Unit = {},
+    onUngroup: () -> Unit = {},
     draggableState: DraggableState = rememberDraggableState {},
     onDragStopped: () -> Unit = {}
 ) {
     val context = LocalContext.current
 
     var configure by rememberSaveable { mutableStateOf(false) }
+    var addNewWidgetToRow by rememberSaveable { mutableStateOf(false) }
 
     var isDragged by remember { mutableStateOf(false) }
     val elevation by animateDpAsState(if (isDragged) 8.dp else 0.dp)
@@ -81,24 +91,26 @@ fun WidgetItem(
                     modifier = Modifier.padding(8.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Icon(
-                        painterResource(R.drawable.drag_indicator_24px),
-                        contentDescription = null,
-                        modifier = Modifier.draggable(
-                            state = draggableState,
-                            orientation = Orientation.Vertical,
-                            startDragImmediately = true,
-                            onDragStarted = {
-                                isDragged = true
-                            },
-                            onDragStopped = {
-                                isDragged = false
-                                onDragStopped()
-                            }
+                    if (!isInRow) {
+                        Icon(
+                            painterResource(R.drawable.drag_indicator_24px),
+                            contentDescription = null,
+                            modifier = Modifier.draggable(
+                                state = draggableState,
+                                orientation = Orientation.Vertical,
+                                startDragImmediately = true,
+                                onDragStarted = {
+                                    isDragged = true
+                                },
+                                onDragStopped = {
+                                    isDragged = false
+                                    onDragStopped()
+                                }
+                            )
                         )
-                    )
+                    }
                     Text(
-                        text = widget.getLabel(LocalContext.current),
+                        text = if (widget is RowWidget) "" else widget.getLabel(LocalContext.current),
                         style = MaterialTheme.typography.titleMedium,
                         modifier = Modifier
                             .weight(1f)
@@ -106,13 +118,44 @@ fun WidgetItem(
                         overflow = TextOverflow.Ellipsis,
                         maxLines = 1
                     )
-                    IconButton(onClick = {
-                        configure = true
-                    }) {
-                        Icon(
-                            painterResource(R.drawable.tune_24px),
-                            contentDescription = stringResource(R.string.settings)
-                        )
+                    if (isInRow) {
+                        IconButton(onClick = { onMoveLeft() }) {
+                            Icon(
+                                painterResource(R.drawable.chevron_backward_24px),
+                                contentDescription = stringResource(R.string.menu_move_left)
+                            )
+                        }
+                        IconButton(onClick = { onMoveRight() }) {
+                            Icon(
+                                painterResource(R.drawable.chevron_forward_24px),
+                                contentDescription = stringResource(R.string.menu_move_right)
+                            )
+                        }
+                        IconButton(onClick = { onUngroup() }) {
+                            Icon(
+                                painterResource(R.drawable.unarchive_24px),
+                                contentDescription = stringResource(R.string.menu_ungroup)
+                            )
+                        }
+                    } else if (widget !is RowWidget) {
+                        IconButton(onClick = {
+                            addNewWidgetToRow = true
+                        }) {
+                            Icon(
+                                painterResource(R.drawable.splitscreen_right_20px),
+                                contentDescription = stringResource(R.string.widget_action_add_to_row)
+                            )
+                        }
+                    }
+                    if (widget !is RowWidget) {
+                        IconButton(onClick = {
+                            configure = true
+                        }) {
+                            Icon(
+                                painterResource(R.drawable.tune_24px),
+                                contentDescription = stringResource(R.string.settings)
+                            )
+                        }
                     }
                     IconButton(onClick = { onWidgetRemove() }) {
                         Icon(
@@ -122,8 +165,16 @@ fun WidgetItem(
                     }
                 }
             }
-            AnimatedVisibility(!editMode) {
+            AnimatedVisibility(!editMode || widget is RowWidget) {
                 when (widget) {
+                    is RowWidget -> {
+                        WidgetRow(
+                            editMode = editMode,
+                            parentId = widget.id,
+                            targetParentId = parentId,
+                        )
+                    }
+
                     is WeatherWidget -> {
                         WeatherWidget(widget)
                     }
@@ -163,5 +214,13 @@ fun WidgetItem(
         widget = widget,
         onWidgetUpdated = onWidgetUpdate,
         onDismiss = { configure = false },
+    )
+    WidgetPickerSheet(
+        expanded = addNewWidgetToRow,
+        onDismiss = { addNewWidgetToRow = false },
+        onWidgetSelected = {
+            onAddToRow(it)
+            addNewWidgetToRow = false
+        }
     )
 }

@@ -88,6 +88,14 @@ fun WidgetColumn(
                     WidgetItem(
                         widget = widget,
                         editMode = editMode,
+                        parentId = try {
+                            UUID.fromString(parentId)
+                        } catch (_: Exception) {
+                            null
+                        },
+                        onAddToRow = { newWidget ->
+                            viewModel.combineIntoRow(widget, newWidget)
+                        },
                         onWidgetAdd = { widget, offset ->
                             viewModel.addWidget(widget, i + offset)
                         },
