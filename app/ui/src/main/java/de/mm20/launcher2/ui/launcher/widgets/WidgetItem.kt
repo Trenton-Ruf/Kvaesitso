@@ -22,6 +22,7 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -225,12 +226,12 @@ fun WidgetItem(
     LauncherCard(
         modifier = modifier
             .zIndex(if (isDragged) 1f else 0f)
-            .then(if (configuredWidth != null && configuredWidth > 0) Modifier.width(configuredWidth.dp) else Modifier)
-            .then(if (configuredHeight != null) Modifier.height(configuredHeight.dp) else Modifier),
+            .then(if (configuredWidth != null && configuredWidth > 0 && !editMode) Modifier.width(configuredWidth.dp) else Modifier)
+            .then(if (configuredHeight != null && !editMode) Modifier.height(configuredHeight.dp) else Modifier),
         elevation = elevation,
         backgroundOpacity = backgroundOpacity,
     ) {
-        Column(modifier = Modifier.fillMaxHeight()) {
+        Column(modifier = if (editMode) Modifier.wrapContentHeight() else Modifier.fillMaxHeight()) {
             AnimatedVisibility(editMode) {
                 Row(
                     modifier = Modifier.padding(8.dp),
@@ -285,7 +286,7 @@ fun WidgetItem(
                     }
                 }
             }
-            AnimatedVisibility(!editMode || widget is RowWidget, modifier = Modifier.weight(1f)) {
+            AnimatedVisibility(!editMode || widget is RowWidget, modifier = if (editMode) Modifier else Modifier.weight(1f)) {
                 if (editMode && widget is RowWidget) {
                     val childViewModel: WidgetsVM = viewModel(
                         key = "widgets-row-edit-${widget.id}",
@@ -306,7 +307,7 @@ fun WidgetItem(
                         state = dragAndDropState,
                         modifier = Modifier
                             .fillMaxWidth()
-                            .heightIn(max = 400.dp) // Limit height in edit mode
+                            .heightIn(max = 2000.dp) // Large enough to typically avoid internal scrolling
                             .padding(horizontal = 8.dp, vertical = 4.dp),
                         bidirectionalDrag = false
                     ) {

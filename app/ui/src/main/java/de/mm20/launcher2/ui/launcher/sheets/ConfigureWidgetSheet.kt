@@ -269,7 +269,7 @@ private fun WidgetPreviewArea(
                             color = MaterialTheme.colorScheme.surface.copy(alpha = MaterialTheme.transparency.surface),
                             shape = MaterialTheme.shapes.medium
                         ) {
-                            WidgetPreviewContent(child)
+                            WidgetPreviewContent(child, modifier = Modifier.fillMaxSize())
                         }
 
                         if (i < children.lastIndex) {
