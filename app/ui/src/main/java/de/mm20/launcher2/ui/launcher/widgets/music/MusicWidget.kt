@@ -90,7 +90,10 @@ import de.mm20.launcher2.widgets.MusicWidget
 import kotlin.math.min
 
 @Composable
-fun MusicWidget(widget: MusicWidget) {
+fun MusicWidget(
+    widget: MusicWidget,
+    modifier: Modifier = Modifier,
+) {
 
     val viewModel: MusicWidgetVM = viewModel(key = "music-widget-${widget.id}")
 
@@ -107,7 +110,7 @@ fun MusicWidget(widget: MusicWidget) {
     val resources = LocalResources.current
 
     Column(
-        modifier = Modifier.fillMaxWidth()
+        modifier = modifier
     ) {
         val hasPermission by viewModel.hasPermission.collectAsStateWithLifecycle(true)
         AnimatedVisibility(!hasPermission) {

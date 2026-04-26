@@ -26,6 +26,8 @@ import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
@@ -101,17 +103,25 @@ import de.mm20.launcher2.ui.component.DismissableBottomSheet
 import de.mm20.launcher2.ui.component.DragResizeHandle
 import de.mm20.launcher2.ui.component.LargeMessage
 import de.mm20.launcher2.ui.component.MissingPermissionBanner
+import de.mm20.launcher2.ui.component.ResizeAxis
 import de.mm20.launcher2.ui.component.dragndrop.DraggableItem
 import de.mm20.launcher2.ui.component.dragndrop.LazyDragAndDropColumn
 import de.mm20.launcher2.ui.component.dragndrop.rememberLazyDragAndDropListState
 import de.mm20.launcher2.ui.component.preferences.CheckboxPreference
 import de.mm20.launcher2.ui.component.preferences.Preference
+import de.mm20.launcher2.ui.component.preferences.SliderPreference
 import de.mm20.launcher2.ui.component.preferences.SwitchPreference
 import de.mm20.launcher2.ui.ktx.toDp
+import de.mm20.launcher2.ui.launcher.widgets.calendar.CalendarWidget
 import de.mm20.launcher2.ui.launcher.widgets.external.AppWidgetHost
+import de.mm20.launcher2.ui.launcher.widgets.favorites.AppsWidget
+import de.mm20.launcher2.ui.launcher.widgets.music.MusicWidget
+import de.mm20.launcher2.ui.launcher.widgets.notes.NotesWidget
+import de.mm20.launcher2.ui.launcher.widgets.weather.WeatherWidget
 import de.mm20.launcher2.ui.locals.LocalDarkTheme
 import de.mm20.launcher2.ui.locals.LocalPreferDarkContentOverWallpaper
 import de.mm20.launcher2.ui.settings.SettingsActivity
+import de.mm20.launcher2.ui.theme.transparency.transparency
 import de.mm20.launcher2.widgets.AppWidget
 import de.mm20.launcher2.widgets.AppsWidget
 import de.mm20.launcher2.widgets.CalendarWidget
@@ -120,13 +130,232 @@ import de.mm20.launcher2.widgets.NotesWidget
 import de.mm20.launcher2.widgets.RowWidget
 import de.mm20.launcher2.widgets.WeatherWidget
 import de.mm20.launcher2.widgets.Widget
+import de.mm20.launcher2.widgets.WidgetRepository
 import kotlinx.collections.immutable.toImmutableList
 import kotlinx.coroutines.flow.map
 import org.koin.compose.koinInject
 import java.text.Collator
 import java.time.ZonedDateTime
 import java.time.format.DateTimeFormatter
+import java.util.UUID
 import kotlin.math.roundToInt
+
+private fun getWidgetWidth(widget: Widget): Int {
+    return when (widget) {
+        is AppWidget -> widget.config.width
+        is WeatherWidget -> widget.config.width
+        is MusicWidget -> widget.config.width
+        is CalendarWidget -> widget.config.width
+        is AppsWidget -> widget.config.width
+        is NotesWidget -> widget.config.width
+        else -> null
+    } ?: 0
+}
+
+private fun updateWidgetWidth(widget: Widget, width: Int): Widget {
+    val w = if (width == 0) null else width
+    return when (widget) {
+        is AppWidget -> widget.copy(config = widget.config.copy(width = w))
+        is WeatherWidget -> widget.copy(config = widget.config.copy(width = w))
+        is MusicWidget -> widget.copy(config = widget.config.copy(width = w))
+        is CalendarWidget -> widget.copy(config = widget.config.copy(width = w))
+        is AppsWidget -> widget.copy(config = widget.config.copy(width = w))
+        is NotesWidget -> widget.copy(config = widget.config.copy(width = w))
+        else -> widget
+    }
+}
+
+private fun getWidgetHeight(widget: Widget): Int {
+    return when (widget) {
+        is AppWidget -> widget.config.height
+        is WeatherWidget -> widget.config.height
+        is MusicWidget -> widget.config.height
+        is CalendarWidget -> widget.config.height
+        is AppsWidget -> widget.config.height
+        is NotesWidget -> widget.config.height
+        is RowWidget -> widget.config.height
+        else -> null
+    } ?: 120
+}
+
+private fun updateWidgetHeight(widget: Widget, height: Int): Widget {
+    return when (widget) {
+        is AppWidget -> widget.copy(config = widget.config.copy(height = height))
+        is WeatherWidget -> widget.copy(config = widget.config.copy(height = height))
+        is MusicWidget -> widget.copy(config = widget.config.copy(height = height))
+        is CalendarWidget -> widget.copy(config = widget.config.copy(height = height))
+        is AppsWidget -> widget.copy(config = widget.config.copy(height = height))
+        is NotesWidget -> widget.copy(config = widget.config.copy(height = height))
+        is RowWidget -> widget.copy(config = widget.config.copy(height = height))
+        else -> widget
+    }
+}
+
+@Composable
+private fun WidgetPreviewContent(
+    widget: Widget,
+    modifier: Modifier = Modifier,
+) {
+    when (widget) {
+        is WeatherWidget -> WeatherWidget(widget, modifier = modifier)
+        is MusicWidget -> MusicWidget(widget, modifier = modifier)
+        is CalendarWidget -> CalendarWidget(widget, modifier = modifier)
+        is AppsWidget -> AppsWidget(widget, modifier = modifier)
+        is NotesWidget -> NotesWidget(widget, onWidgetAdd = { _, _ -> }, modifier = modifier)
+        is AppWidget -> {
+            val context = LocalContext.current
+            val widgetInfo = remember(widget.config.widgetId) {
+                AppWidgetManager.getInstance(context).getAppWidgetInfo(widget.config.widgetId)
+            }
+            if (widgetInfo != null) {
+                AppWidgetHost(
+                    widgetInfo = widgetInfo,
+                    widgetId = widget.config.widgetId,
+                    modifier = modifier.fillMaxSize(),
+                    borderless = widget.config.borderless,
+                    useThemeColors = widget.config.themeColors,
+                    onLightBackground = (!LocalDarkTheme.current && widget.config.background) || LocalPreferDarkContentOverWallpaper.current
+                )
+            }
+        }
+
+        is RowWidget -> {}
+    }
+}
+
+@Composable
+private fun WidgetPreviewArea(
+    widget: Widget,
+    onWidgetUpdated: (Widget) -> Unit,
+) {
+    val repository: WidgetRepository = koinInject()
+
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(bottom = 64.dp)
+            .background(MaterialTheme.colorScheme.surfaceVariant, MaterialTheme.shapes.medium)
+    ) {
+        var resizeHeight by remember {
+            mutableStateOf(getWidgetHeight(widget).dp)
+        }
+
+        if (widget is RowWidget) {
+            val children by remember(widget.id) {
+                repository.get(parent = widget.id)
+            }.collectAsState(emptyList())
+
+            Row(
+                modifier = Modifier
+                    .clip(MaterialTheme.shapes.medium)
+                    .fillMaxWidth()
+                    .height(resizeHeight)
+                    .align(Alignment.TopCenter)
+            ) {
+                for ((i, child) in children.withIndex()) {
+                    val childWidthValue = getWidgetWidth(child)
+                    var resizeWidth by remember(child.id) {
+                        mutableStateOf(if (childWidthValue == 0) Dp.Unspecified else childWidthValue.dp)
+                    }
+                    val isLast = i == children.lastIndex
+
+                    Box(
+                        modifier = (if (resizeWidth.isUnspecified || isLast) Modifier.weight(1f) else Modifier.width(resizeWidth))
+                            .fillMaxHeight()
+                            .padding(start = if (i > 0) 8.dp else 0.dp)
+                    ) {
+                        Surface(
+                            modifier = Modifier.fillMaxSize(),
+                            color = MaterialTheme.colorScheme.surface.copy(alpha = MaterialTheme.transparency.surface),
+                            shape = MaterialTheme.shapes.medium
+                        ) {
+                            WidgetPreviewContent(child)
+                        }
+
+                        if (i < children.lastIndex) {
+                            DragResizeHandle(
+                                resizeAxis = ResizeAxis.Horizontal,
+                                alignment = Alignment.TopStart,
+                                width = resizeWidth,
+                                height = Dp.Unspecified,
+                                onResize = { w, _ ->
+                                    resizeWidth = w
+                                },
+                                onResizeStopped = {
+                                    repository.update(
+                                        updateWidgetWidth(
+                                            child,
+                                            resizeWidth.takeIf { !it.isUnspecified }?.value?.roundToInt() ?: 0
+                                        )
+                                    )
+                                }
+                            )
+                        }
+                    }
+                }
+            }
+        } else {
+            val widthValue = getWidgetWidth(widget)
+            var resizeWidth by remember {
+                mutableStateOf(if (widthValue == 0) Dp.Unspecified else widthValue.dp)
+            }
+
+            Box(
+                modifier = Modifier
+                    .then(
+                        if (resizeWidth.isUnspecified) Modifier.fillMaxWidth()
+                        else Modifier.width(resizeWidth)
+                    )
+                    .height(resizeHeight)
+                    .align(Alignment.TopCenter)
+            ) {
+                Surface(
+                    modifier = Modifier.fillMaxSize(),
+                    color = MaterialTheme.colorScheme.surface.copy(alpha = if (widget is AppWidget && !widget.config.background) 0f else MaterialTheme.transparency.surface),
+                    shape = MaterialTheme.shapes.medium
+                ) {
+                    WidgetPreviewContent(widget)
+                }
+
+                DragResizeHandle(
+                    alignment = Alignment.TopCenter,
+                    height = resizeHeight,
+                    width = resizeWidth,
+                    snapToMeasuredWidth = true,
+                    onResize = { w, h ->
+                        resizeWidth = w
+                        resizeHeight = h
+                    },
+                    onResizeStopped = {
+                        onWidgetUpdated(
+                            updateWidgetHeight(
+                                updateWidgetWidth(
+                                    widget,
+                                    resizeWidth.takeIf { !it.isUnspecified }?.value?.roundToInt() ?: 0
+                                ),
+                                resizeHeight.value.roundToInt()
+                            )
+                        )
+                    }
+                )
+            }
+        }
+
+        if (widget is RowWidget) {
+            DragResizeHandle(
+                resizeAxis = ResizeAxis.Vertical,
+                alignment = Alignment.TopCenter,
+                height = resizeHeight,
+                onResize = { _, h ->
+                    resizeHeight = h
+                },
+                onResizeStopped = {
+                    onWidgetUpdated(updateWidgetHeight(widget, resizeHeight.value.roundToInt()))
+                }
+            )
+        }
+    }
+}
 
 @Composable
 fun ConfigureWidgetSheet(
@@ -142,10 +371,14 @@ fun ConfigureWidgetSheet(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = if (widget is AppWidget) 8.dp else 16.dp, vertical = 16.dp)
+                .padding(horizontal = 16.dp, vertical = 16.dp)
                 .navigationBarsPadding()
                 .verticalScroll(rememberScrollState())
         ) {
+            WidgetPreviewArea(widget, onWidgetUpdated)
+
+            Spacer(modifier = Modifier.height(16.dp))
+
             when (widget) {
                 is WeatherWidget -> ConfigureWeatherWidget(widget, onWidgetUpdated)
                 is AppWidget -> ConfigureAppWidget(widget, onWidgetUpdated)
@@ -153,7 +386,7 @@ fun ConfigureWidgetSheet(
                 is AppsWidget -> ConfigureFavoritesWidget(widget, onWidgetUpdated)
                 is MusicWidget -> ConfigureMusicWidget(widget, onWidgetUpdated)
                 is NotesWidget -> ConfigureNotesWidget(widget, onWidgetUpdated)
-                is RowWidget -> {}
+                is RowWidget -> ConfigureRowWidget(widget, onWidgetUpdated)
             }
         }
 
@@ -161,26 +394,34 @@ fun ConfigureWidgetSheet(
 }
 
 @Composable
-fun ColumnScope.ConfigureWeatherWidget(
+fun ColumnScope.WeatherWidgetSettings(
     widget: WeatherWidget,
     onWidgetUpdated: (WeatherWidget) -> Unit,
 ) {
     val context = LocalContext.current
+    SwitchPreference(
+        title = stringResource(R.string.widget_config_weather_compact),
+        iconPadding = false,
+        value = !widget.config.showForecast,
+        onValueChanged = {
+            onWidgetUpdated(widget.copy(config = widget.config.copy(showForecast = !it)))
+        }
+    )
+}
 
+@Composable
+fun ColumnScope.ConfigureWeatherWidget(
+    widget: WeatherWidget,
+    onWidgetUpdated: (WeatherWidget) -> Unit,
+) {
     OutlinedCard {
         Column(
             modifier = Modifier.fillMaxWidth()
         ) {
-            SwitchPreference(
-                title = stringResource(R.string.widget_config_weather_compact),
-                iconPadding = false,
-                value = !widget.config.showForecast,
-                onValueChanged = {
-                    onWidgetUpdated(widget.copy(config = widget.config.copy(showForecast = !it)))
-                }
-            )
+            WeatherWidgetSettings(widget, onWidgetUpdated)
         }
     }
+    val context = LocalContext.current
     TextButton(
         modifier = Modifier
             .padding(top = 8.dp)
@@ -214,7 +455,7 @@ fun ColumnScope.ConfigureWeatherWidget(
 }
 
 @Composable
-fun ColumnScope.ConfigureFavoritesWidget(
+fun ColumnScope.AppsWidgetSettings(
     widget: AppsWidget,
     onWidgetUpdated: (AppsWidget) -> Unit,
 ) {
@@ -557,27 +798,42 @@ fun ColumnScope.ConfigureFavoritesWidget(
 }
 
 @Composable
+fun ColumnScope.ConfigureFavoritesWidget(
+    widget: AppsWidget,
+    onWidgetUpdated: (AppsWidget) -> Unit,
+) {
+    AppsWidgetSettings(widget, onWidgetUpdated)
+}
+
+@Composable
+fun ColumnScope.MusicWidgetSettings(
+    widget: MusicWidget,
+    onWidgetUpdated: (MusicWidget) -> Unit,
+) {
+    SwitchPreference(
+        title = stringResource(R.string.music_widget_interactive_progress_bar),
+        iconPadding = false,
+        value = widget.config.interactiveProgressBar,
+        onValueChanged = {
+            onWidgetUpdated(widget.copy(config = widget.config.copy(interactiveProgressBar = it)))
+        }
+    )
+}
+
+@Composable
 fun ColumnScope.ConfigureMusicWidget(
     widget: MusicWidget,
     onWidgetUpdated: (MusicWidget) -> Unit,
 ) {
-    val context = LocalContext.current
-
     OutlinedCard {
         Column(
             modifier = Modifier.fillMaxWidth()
         ) {
-            SwitchPreference(
-                title = stringResource(R.string.music_widget_interactive_progress_bar),
-                iconPadding = false,
-                value = widget.config.interactiveProgressBar,
-                onValueChanged = {
-                    onWidgetUpdated(widget.copy(config = widget.config.copy(interactiveProgressBar = it)))
-                }
-            )
+            MusicWidgetSettings(widget, onWidgetUpdated)
         }
     }
 
+    val context = LocalContext.current
     TextButton(
         modifier = Modifier
             .align(Alignment.CenterHorizontally),
@@ -610,12 +866,90 @@ fun ColumnScope.ConfigureMusicWidget(
 }
 
 @Composable
+fun ColumnScope.AppWidgetSettings(
+    widget: AppWidget,
+    widgetInfo: AppWidgetProviderInfo,
+    onWidgetUpdated: (AppWidget) -> Unit,
+) {
+    val lifecycleOwner = LocalLifecycleOwner.current
+    SwitchPreference(
+        title = stringResource(R.string.widget_config_appwidget_borderless),
+        iconPadding = false,
+        value = widget.config.borderless,
+        onValueChanged = {
+            onWidgetUpdated(widget.copy(config = widget.config.copy(borderless = it)))
+        }
+    )
+    HorizontalDivider()
+    SwitchPreference(
+        title = stringResource(R.string.widget_config_appwidget_background),
+        iconPadding = false,
+        value = widget.config.background,
+        onValueChanged = {
+            onWidgetUpdated(widget.copy(config = widget.config.copy(background = it)))
+        }
+    )
+    if (isAtLeastApiLevel(31)) {
+        HorizontalDivider()
+        SwitchPreference(
+            title = stringResource(R.string.widget_use_theme_colors),
+            iconPadding = false,
+            value = widget.config.themeColors,
+            onValueChanged = {
+                onWidgetUpdated(widget.copy(config = widget.config.copy(themeColors = it)))
+            }
+        )
+    }
+
+    if (isAtLeastApiLevel(28) && widgetInfo.widgetFeatures and AppWidgetProviderInfo.WIDGET_FEATURE_RECONFIGURABLE != 0) {
+        val appWidgetHost = LocalAppWidgetHost.current
+        TextButton(
+            modifier = Modifier
+                .padding(top = 8.dp)
+                .align(Alignment.End),
+            contentPadding = PaddingValues(
+                end = 16.dp,
+                top = 8.dp,
+                start = 24.dp,
+                bottom = 8.dp,
+            ),
+            onClick = {
+                appWidgetHost.startAppWidgetConfigureActivityForResult(
+                    lifecycleOwner as Activity,
+                    widget.config.widgetId,
+                    0,
+                    0,
+                    if (Build.VERSION.SDK_INT < 34) {
+                        null
+                    } else {
+                        ActivityOptions.makeBasic()
+                            .setPendingIntentBackgroundActivityStartMode(
+                                ActivityOptions.MODE_BACKGROUND_ACTIVITY_START_ALLOWED
+                            )
+                            .toBundle()
+                    }
+                )
+            }) {
+            Text(
+                stringResource(id = R.string.widget_config_appwidget_configure)
+            )
+            Icon(
+                modifier = Modifier
+                    .padding(start = ButtonDefaults.IconSpacing)
+                    .requiredSize(ButtonDefaults.IconSize),
+                painter = painterResource(R.drawable.open_in_new_20px),
+                contentDescription = null
+            )
+        }
+    }
+}
+
+@Composable
 fun ColumnScope.ConfigureAppWidget(
     widget: AppWidget,
     onWidgetUpdated: (Widget) -> Unit,
 ) {
     val context = LocalContext.current
-    val lifecycleOwner = LocalLifecycleOwner.current
     val widgetInfo = remember(widget.config.widgetId) {
         AppWidgetManager.getInstance(context).getAppWidgetInfo(widget.config.widgetId)
     }
@@ -676,90 +1010,6 @@ fun ColumnScope.ConfigureAppWidget(
         return
     }
 
-    Column {
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(bottom = 64.dp)
-                .background(MaterialTheme.colorScheme.surfaceVariant, MaterialTheme.shapes.medium)
-        ) {
-            var resizeWidth by remember {
-                mutableStateOf(widget.config.width?.dp ?: Dp.Unspecified)
-            }
-
-            var resizeHeight by remember {
-                mutableStateOf(widget.config.height.dp)
-            }
-
-            AppWidgetHost(
-                widgetInfo = widgetInfo,
-                widgetId = widget.config.widgetId,
-                modifier = Modifier
-                    .clip(MaterialTheme.shapes.medium)
-                    .then(
-                        if (resizeWidth.isUnspecified) Modifier.fillMaxWidth()
-                        else Modifier.width(resizeWidth)
-                    )
-                    .height(resizeHeight)
-                    .align(Alignment.TopCenter)
-                    .pointerInput(Unit) {
-                        awaitEachGesture {
-                            val event = awaitFirstDown(pass = PointerEventPass.Initial)
-                            event.consume()
-                        }
-                    },
-                borderless = widget.config.borderless,
-                useThemeColors = widget.config.themeColors,
-                onLightBackground = (!LocalDarkTheme.current && widget.config.background) || LocalPreferDarkContentOverWallpaper.current
-            )
-
-            val maxWidth = if (isAtLeastApiLevel(31)) {
-                widgetInfo.maxResizeWidth.takeIf { it > 0 }?.toDp() ?: Dp.Unspecified
-            } else Dp.Unspecified
-
-            val maxHeight = if (isAtLeastApiLevel(31)) {
-                widgetInfo.maxResizeHeight.takeIf { it > 0 }?.toDp() ?: 2000.dp
-            } else 2000.dp
-
-            val minWidth = if (widgetInfo.minResizeWidth in 1..widgetInfo.minWidth) {
-                widgetInfo.minResizeWidth.toDp()
-            } else {
-                widgetInfo.minWidth.toDp()
-            }
-
-            val minHeight = if (widgetInfo.minResizeHeight in 1..widgetInfo.minHeight) {
-                widgetInfo.minResizeHeight.toDp()
-            } else {
-                widgetInfo.minHeight.toDp()
-            }
-
-            DragResizeHandle(
-                alignment = Alignment.TopCenter,
-                height = resizeHeight,
-                width = resizeWidth,
-                minWidth = minWidth,
-                minHeight = minHeight,
-                maxWidth = maxWidth,
-                maxHeight = maxHeight,
-                snapToMeasuredWidth = true,
-                onResize = { w, h ->
-                    resizeWidth = w
-                    resizeHeight = h
-                },
-                onResizeStopped = {
-                    onWidgetUpdated(
-                        widget.copy(
-                            config = widget.config.copy(
-                                height = resizeHeight.value.roundToInt(),
-                                width = resizeWidth.takeIf { it != Dp.Unspecified }?.value?.roundToInt()
-                            )
-                        )
-                    )
-                }
-            )
-        }
-    }
-
     Column(
         modifier = Modifier.padding(horizontal = 8.dp)
     ) {
@@ -767,82 +1017,16 @@ fun ColumnScope.ConfigureAppWidget(
             Column(
                 modifier = Modifier.fillMaxWidth()
             ) {
-                SwitchPreference(
-                    title = stringResource(R.string.widget_config_appwidget_borderless),
-                    iconPadding = false,
-                    value = widget.config.borderless,
-                    onValueChanged = {
-                        onWidgetUpdated(widget.copy(config = widget.config.copy(borderless = it)))
-                    }
-                )
-                HorizontalDivider()
-                SwitchPreference(
-                    title = stringResource(R.string.widget_config_appwidget_background),
-                    iconPadding = false,
-                    value = widget.config.background,
-                    onValueChanged = {
-                        onWidgetUpdated(widget.copy(config = widget.config.copy(background = it)))
-                    }
-                )
-                if (isAtLeastApiLevel(31)) {
-                    HorizontalDivider()
-                    SwitchPreference(
-                        title = stringResource(R.string.widget_use_theme_colors),
-                        iconPadding = false,
-                        value = widget.config.themeColors,
-                        onValueChanged = {
-                            onWidgetUpdated(widget.copy(config = widget.config.copy(themeColors = it)))
-                        }
-                    )
-                }
-            }
-        }
-        if (isAtLeastApiLevel(28) && widgetInfo.widgetFeatures and AppWidgetProviderInfo.WIDGET_FEATURE_RECONFIGURABLE != 0) {
-            val appWidgetHost = LocalAppWidgetHost.current
-            TextButton(
-                modifier = Modifier
-                    .padding(top = 8.dp)
-                    .align(Alignment.End),
-                contentPadding = PaddingValues(
-                    end = 16.dp,
-                    top = 8.dp,
-                    start = 24.dp,
-                    bottom = 8.dp,
-                ),
-                onClick = {
-                    appWidgetHost.startAppWidgetConfigureActivityForResult(
-                        lifecycleOwner as Activity,
-                        widget.config.widgetId,
-                        0,
-                        0,
-                        if (Build.VERSION.SDK_INT < 34) {
-                            null
-                        } else {
-                            ActivityOptions.makeBasic()
-                                .setPendingIntentBackgroundActivityStartMode(
-                                    ActivityOptions.MODE_BACKGROUND_ACTIVITY_START_ALLOWED
-                                )
-                                .toBundle()
-                        }
-                    )
-                }) {
-                Text(
-                    stringResource(id = R.string.widget_config_appwidget_configure)
-                )
-                Icon(
-                    modifier = Modifier
-                        .padding(start = ButtonDefaults.IconSpacing)
-                        .requiredSize(ButtonDefaults.IconSize),
-                    painter = painterResource(R.drawable.open_in_new_20px),
-                    contentDescription = null
-                )
+                AppWidgetSettings(widget, widgetInfo, onWidgetUpdated = {
+                    onWidgetUpdated(it)
+                })
             }
         }
     }
 }
 
 @Composable
-fun ColumnScope.ConfigureCalendarWidget(
+fun ColumnScope.CalendarWidgetSettings(
     widget: CalendarWidget,
     onWidgetUpdated: (CalendarWidget) -> Unit
 ) {
@@ -870,19 +1054,16 @@ fun ColumnScope.ConfigureCalendarWidget(
     }
 
     AnimatedVisibility(hasTasks) {
-        OutlinedCard {
-            Column(
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                SwitchPreference(
-                    title = stringResource(R.string.preference_calendar_hide_completed),
-                    iconPadding = false,
-                    value = !widget.config.completedTasks,
-                    onValueChanged = {
-                        onWidgetUpdated(widget.copy(config = widget.config.copy(completedTasks = !it)))
-                    }
-                )
-            }
+        Column {
+            SwitchPreference(
+                title = stringResource(R.string.preference_calendar_hide_completed),
+                iconPadding = false,
+                value = !widget.config.completedTasks,
+                onValueChanged = {
+                    onWidgetUpdated(widget.copy(config = widget.config.copy(completedTasks = !it)))
+                }
+            )
+            HorizontalDivider()
         }
     }
     val context = LocalLifecycleOwner.current as AppCompatActivity
@@ -995,7 +1176,15 @@ fun ColumnScope.ConfigureCalendarWidget(
 }
 
 @Composable
-fun ConfigureNotesWidget(
+fun ColumnScope.ConfigureCalendarWidget(
+    widget: CalendarWidget,
+    onWidgetUpdated: (CalendarWidget) -> Unit
+) {
+    CalendarWidgetSettings(widget, onWidgetUpdated)
+}
+
+@Composable
+fun NotesWidgetSettings(
     widget: NotesWidget,
     onWidgetUpdated: (NotesWidget) -> Unit
 ) {
@@ -1032,47 +1221,111 @@ fun ConfigureNotesWidget(
             CrashReporter.logException(e)
         }
     }
-    OutlinedCard {
-        if (widget.config.linkedFile != null) {
-            Preference(
-                icon = { Icon(painterResource(R.drawable.link_off_24px), null) },
-                title = { Text(stringResource(R.string.note_widget_action_unlink_file)) },
-                summary = {
-                    Text(
-                        stringResource(
-                            R.string.note_widget_linked_file_summary,
-                            formatLinkedFileUri(widget.config.linkedFile?.toUri())
+    if (widget.config.linkedFile != null) {
+        Preference(
+            icon = { Icon(painterResource(R.drawable.link_off_24px), null) },
+            title = { Text(stringResource(R.string.note_widget_action_unlink_file)) },
+            summary = {
+                Text(
+                    stringResource(
+                        R.string.note_widget_linked_file_summary,
+                        formatLinkedFileUri(widget.config.linkedFile?.toUri())
+                    )
+                )
+            },
+            onClick = {
+                try {
+                    context.contentResolver.releasePersistableUriPermission(
+                        Uri.parse(widget.config.linkedFile),
+                        Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION
+                    )
+                } catch (e: SecurityException) {
+                    CrashReporter.logException(e)
+                }
+                onWidgetUpdated(widget.copy(config = widget.config.copy(linkedFile = null)))
+            }
+        )
+    } else {
+        Preference(
+            title = stringResource(R.string.note_widget_link_file),
+            summary = stringResource(R.string.note_widget_link_file_summary),
+            icon = R.drawable.link_24px,
+            onClick = {
+                linkFileLauncher.launch(
+                    resources.getString(
+                        R.string.notes_widget_export_filename,
+                        ZonedDateTime.now().format(
+                            DateTimeFormatter.ISO_INSTANT
                         )
                     )
-                },
-                onClick = {
-                    try {
-                        context.contentResolver.releasePersistableUriPermission(
-                            Uri.parse(widget.config.linkedFile),
-                            Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION
-                        )
-                    } catch (e: SecurityException) {
-                        CrashReporter.logException(e)
+                )
+            }
+        )
+    }
+}
+
+@Composable
+fun ConfigureNotesWidget(
+    widget: NotesWidget,
+    onWidgetUpdated: (NotesWidget) -> Unit
+) {
+    NotesWidgetSettings(widget, onWidgetUpdated)
+}
+
+@Composable
+fun ColumnScope.ConfigureRowWidget(
+    widget: RowWidget,
+    onWidgetUpdated: (RowWidget) -> Unit,
+) {
+    val repository: WidgetRepository = koinInject()
+    val children by remember(widget.id) {
+        repository.get(parent = widget.id)
+    }.collectAsState(emptyList())
+
+    if (children.isNotEmpty()) {
+        for (child in children) {
+            Text(
+                modifier = Modifier.padding(top = 16.dp, bottom = 4.dp),
+                style = MaterialTheme.typography.titleSmall,
+                color = MaterialTheme.colorScheme.secondary,
+                text = child.getLabel(LocalContext.current)
+            )
+
+            OutlinedCard {
+                Column(
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    when (child) {
+                        is AppWidget -> {
+                            val context = LocalContext.current
+                            val widgetInfo = remember(child.config.widgetId) {
+                                AppWidgetManager.getInstance(context).getAppWidgetInfo(child.config.widgetId)
+                            }
+                            if (widgetInfo != null) {
+                                AppWidgetSettings(child, widgetInfo, onWidgetUpdated = {
+                                    repository.update(it)
+                                })
+                            }
+                        }
+                        is WeatherWidget -> WeatherWidgetSettings(child, onWidgetUpdated = {
+                            repository.update(it)
+                        })
+                        is MusicWidget -> MusicWidgetSettings(child, onWidgetUpdated = {
+                            repository.update(it)
+                        })
+                        is CalendarWidget -> CalendarWidgetSettings(child, onWidgetUpdated = {
+                            repository.update(it)
+                        })
+                        is AppsWidget -> AppsWidgetSettings(child, onWidgetUpdated = {
+                            repository.update(it)
+                        })
+                        is NotesWidget -> NotesWidgetSettings(child, onWidgetUpdated = {
+                            repository.update(it)
+                        })
+                        is RowWidget -> {}
                     }
-                    onWidgetUpdated(widget.copy(config = widget.config.copy(linkedFile = null)))
                 }
-            )
-        } else {
-            Preference(
-                title = stringResource(R.string.note_widget_link_file),
-                summary = stringResource(R.string.note_widget_link_file_summary),
-                icon = R.drawable.link_24px,
-                onClick = {
-                    linkFileLauncher.launch(
-                        resources.getString(
-                            R.string.notes_widget_export_filename,
-                            ZonedDateTime.now().format(
-                                DateTimeFormatter.ISO_INSTANT
-                            )
-                        )
-                    )
-                }
-            )
+            }
         }
     }
 }

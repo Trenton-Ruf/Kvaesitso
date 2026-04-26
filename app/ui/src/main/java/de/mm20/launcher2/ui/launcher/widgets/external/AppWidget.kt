@@ -2,6 +2,7 @@ package de.mm20.launcher2.ui.launcher.widgets.external
 
 import android.appwidget.AppWidgetManager
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -39,6 +40,7 @@ fun AppWidget(
     widget: AppWidget,
     onWidgetUpdate: (Widget) -> Unit,
     onWidgetRemove: () -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
 
@@ -54,7 +56,7 @@ fun AppWidget(
             mutableStateOf(false)
         }
         Banner(
-            modifier = Modifier.padding(16.dp),
+            modifier = modifier.padding(16.dp),
             text = stringResource(R.string.app_widget_loading_failed),
             icon = R.drawable.warning_24px,
             secondaryAction = {
@@ -91,16 +93,11 @@ fun AppWidget(
             }
         )
     } else {
-        val width = widget.config.width
-        Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+        Box(modifier = modifier, contentAlignment = Alignment.Center) {
             AppWidgetHost(
                 widgetId = widget.config.widgetId,
                 widgetInfo = widgetInfo,
-                modifier = Modifier
-                    .then(
-                        if (width == null) Modifier.fillMaxWidth() else Modifier.width(width.dp)
-                    )
-                    .height(widget.config.height.dp),
+                modifier = Modifier.fillMaxSize(),
                 borderless = widget.config.borderless,
                 useThemeColors = widget.config.themeColors,
                 onLightBackground = lightBackground,

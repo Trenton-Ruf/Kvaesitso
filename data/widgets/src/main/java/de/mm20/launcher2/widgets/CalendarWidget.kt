@@ -19,6 +19,8 @@ data class CalendarWidgetConfig(
     val completedTasks: Boolean = true,
     val upcomingEventsCount: Int = 3,
     val upcomingTaskCount: Int = 3,
+    val height: Int? = null,
+    val width: Int? = null,
 )
 data class CalendarWidget(
     override val id: UUID,

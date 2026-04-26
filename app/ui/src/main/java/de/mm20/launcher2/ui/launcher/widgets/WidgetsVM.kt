@@ -10,7 +10,9 @@ import de.mm20.launcher2.widgets.RowWidget
 import de.mm20.launcher2.widgets.Widget
 import de.mm20.launcher2.widgets.WidgetRepository
 import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.launch
 import org.koin.core.component.KoinComponent
 import org.koin.core.component.inject
 import java.util.UUID
@@ -61,6 +63,13 @@ class WidgetsVM(
     }
 
     fun combineIntoRow(originalWidget: Widget, newWidget: Widget) {
+        if (originalWidget is RowWidget) {
+            viewModelScope.launch {
+                val children = widgetRepository.get(parent = originalWidget.id).first()
+                widgetRepository.set(children + newWidget, originalWidget.id)
+            }
+            return
+        }
         val widgets = widgets.value.toMutableList()
         val index = widgets.indexOfFirst { it.id == originalWidget.id }
         if (index == -1) return

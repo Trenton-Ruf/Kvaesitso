@@ -4,6 +4,8 @@ import android.content.Context
 import de.mm20.launcher2.database.entities.PartialWidgetEntity
 import de.mm20.launcher2.database.entities.WidgetEntity
 import de.mm20.launcher2.ktx.decodeFromStringOrNull
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import java.util.UUID
 
@@ -67,7 +69,12 @@ sealed class Widget {
                             ?: NotesWidgetConfig()
                     NotesWidget(entity.id, config)
                 }
-                RowWidget.Type -> RowWidget(entity.id)
+                RowWidget.Type -> {
+                    val config: RowWidgetConfig =
+                        Json.decodeFromStringOrNull(entity.config?.takeIf { it.isNotBlank() })
+                            ?: RowWidgetConfig()
+                    RowWidget(entity.id, config)
+                }
 
                 else -> null
             }
@@ -75,8 +82,14 @@ sealed class Widget {
     }
 }
 
+@Serializable
+data class RowWidgetConfig(
+    val height: Int = 120,
+)
+
 data class RowWidget(
     override val id: UUID,
+    val config: RowWidgetConfig = RowWidgetConfig(),
 ) : Widget() {
     override fun getLabel(context: Context): String {
         return context.getString(R.string.widget_name_row)
@@ -86,7 +99,7 @@ data class RowWidget(
         return PartialWidgetEntity(
             id = id,
             type = Type,
-            config = null,
+            config = Json.encodeToString(config),
         )
     }
 

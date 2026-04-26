@@ -20,7 +20,10 @@ import de.mm20.launcher2.ui.launcher.search.common.grid.SearchResultGrid
 import de.mm20.launcher2.widgets.AppsWidget
 
 @Composable
-fun AppsWidget(widget: AppsWidget) {
+fun AppsWidget(
+    widget: AppsWidget,
+    modifier: Modifier = Modifier,
+) {
     val viewModel: AppsWidgetVM = viewModel(key = "favorites-widget-${widget.id}")
     val favorites by remember { viewModel.favorites }.collectAsState(emptyList())
     val pinnedTags by viewModel.pinnedTags.collectAsState(emptyList())
@@ -37,7 +40,7 @@ fun AppsWidget(widget: AppsWidget) {
     }
 
     Column(
-        modifier = Modifier.padding(vertical = 4.dp)
+        modifier = modifier.padding(vertical = 4.dp)
     ) {
         if (favorites.isNotEmpty()) {
             SearchResultGrid(favorites, transitionKey = selectedTag)

@@ -62,6 +62,7 @@ import java.time.ZoneId
 @Composable
 fun CalendarWidget(
     widget: CalendarWidget,
+    modifier: Modifier = Modifier,
 ) {
     val viewModel: CalendarWidgetVM = viewModel(key = "calendar-widget-${widget.id}")
     val context = LocalContext.current
@@ -79,7 +80,7 @@ fun CalendarWidget(
         viewModel.updateWidget(widget)
     }
 
-    Column {
+    Column(modifier = modifier) {
         Row(
             verticalAlignment = Alignment.CenterVertically,
             modifier = Modifier.padding(start = 8.dp, end = 8.dp, top = 8.dp, bottom = 4.dp)
