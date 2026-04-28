@@ -120,6 +120,7 @@ fun WidgetColumn(
                             viewModel.updateWidget(it)
                         },
                         modifier = Modifier
+                            .align(Alignment.CenterHorizontally)
                             .fillMaxWidth()
                             .onPlaced {
                                 swapThresholds[i][0] = it.positionInParent().y

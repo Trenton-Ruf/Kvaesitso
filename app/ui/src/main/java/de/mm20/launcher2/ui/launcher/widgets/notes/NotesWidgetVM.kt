@@ -103,13 +103,15 @@ class NotesWidgetVM(
                 CrashReporter.logException(e)
                 noteText.value = TextFieldValue(widget.config.storedText)
                 linkedFileReadError.value = true
-                widgetsService.updateWidget(
-                    widget.copy(
-                        config = widget.config.copy(
-                            lastSyncSuccessful = false
+                viewModelScope.launch {
+                    widgetsService.updateWidget(
+                        widget.copy(
+                            config = widget.config.copy(
+                                lastSyncSuccessful = false
+                            )
                         )
                     )
-                )
+                }
             }
         }
     }
@@ -139,7 +141,9 @@ class NotesWidgetVM(
     }
 
     fun dismissNote() {
-        widgetsService.removeWidget(widget.value ?: return)
+        viewModelScope.launch {
+            widgetsService.removeWidget(widget.value ?: return@launch)
+        }
     }
 
     private var writeSemaphore = Semaphore(1)
@@ -186,14 +190,16 @@ class NotesWidgetVM(
 
             LinkedFileConflictStrategy.KeepFile -> {
                 val text = noteText.value.text
-                widgetsService.updateWidget(
-                    widget.copy(
-                        config = widget.config.copy(
-                            lastSyncSuccessful = true,
-                            storedText = text,
+                viewModelScope.launch {
+                    widgetsService.updateWidget(
+                        widget.copy(
+                            config = widget.config.copy(
+                                lastSyncSuccessful = true,
+                                storedText = text,
+                            )
                         )
                     )
-                )
+                }
             }
 
             LinkedFileConflictStrategy.Unlink -> {
@@ -206,14 +212,16 @@ class NotesWidgetVM(
 
     fun unlinkFile(context: Context) {
         val widget = widget.value ?: return
-        widgetsService.updateWidget(
-            widget.copy(
-                config = widget.config.copy(
-                    linkedFile = null,
-                    lastSyncSuccessful = false
+        viewModelScope.launch {
+            widgetsService.updateWidget(
+                widget.copy(
+                    config = widget.config.copy(
+                        linkedFile = null,
+                        lastSyncSuccessful = false
+                    )
                 )
             )
-        )
+        }
         linkedFileSavingState.value = LinkedFileSavingState.Saved
         linkedFileReadError.value = false
         linkedFileConflict.value = false
@@ -228,7 +236,9 @@ class NotesWidgetVM(
     }
 
     fun dismissWidget(widget: Widget) {
-        widgetsService.removeWidget(widget)
+        viewModelScope.launch {
+            widgetsService.removeWidget(widget)
+        }
     }
 
     fun linkFile(context: Context, uri: Uri) {
@@ -248,14 +258,16 @@ class NotesWidgetVM(
                     CrashReporter.logException(e)
                 }
             }
-            widgetsService.updateWidget(
-                widget.copy(
-                    config = widget.config.copy(
-                        linkedFile = uri.toString(),
-                        lastSyncSuccessful = false
+            viewModelScope.launch {
+                widgetsService.updateWidget(
+                    widget.copy(
+                        config = widget.config.copy(
+                            linkedFile = uri.toString(),
+                            lastSyncSuccessful = false
+                        )
                     )
                 )
-            )
+            }
         } catch (e: SecurityException) {
             CrashReporter.logException(e)
         }
@@ -265,7 +277,9 @@ class NotesWidgetVM(
         val updatedWidget = widget.value?.copy(config = config) ?: return
         noteText.value = TextFieldValue(config.storedText)
         widget.value = updatedWidget
-        widgetsService.updateWidget(updatedWidget)
+        viewModelScope.launch {
+            widgetsService.updateWidget(updatedWidget)
+        }
     }
 
 

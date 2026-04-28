@@ -12,6 +12,7 @@ import java.util.UUID
 sealed class Widget {
 
     abstract val id: UUID
+    open val isProtected: Boolean = true
     internal fun toDatabaseEntity(position: Int, parentId: UUID? = null): WidgetEntity {
         return toDatabaseEntity().let {
             WidgetEntity(
@@ -91,6 +92,7 @@ data class RowWidget(
     override val id: UUID,
     val config: RowWidgetConfig = RowWidgetConfig(),
 ) : Widget() {
+    override val isProtected: Boolean = false
     override fun getLabel(context: Context): String {
         return context.getString(R.string.widget_name_row)
     }

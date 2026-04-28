@@ -1,10 +1,10 @@
 package de.mm20.launcher2.ui.launcher.widgets
 
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -14,11 +14,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import de.mm20.launcher2.widgets.AppWidget
-import de.mm20.launcher2.widgets.AppsWidget
-import de.mm20.launcher2.widgets.CalendarWidget
-import de.mm20.launcher2.widgets.MusicWidget
-import de.mm20.launcher2.widgets.NotesWidget
-import de.mm20.launcher2.widgets.WeatherWidget
 import java.util.UUID
 
 @Composable
@@ -40,27 +35,19 @@ fun WidgetRow(
         modifier = modifier
             .fillMaxWidth()
             .height(height.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
     ) {
         for ((i, widget) in widgets.withIndex()) {
             key(widget.id) {
-                val width = when (widget) {
-                    is AppWidget -> widget.config.width
-                    is WeatherWidget -> widget.config.width
-                    is MusicWidget -> widget.config.width
-                    is CalendarWidget -> widget.config.width
-                    is AppsWidget -> widget.config.width
-                    is NotesWidget -> widget.config.width
-                    else -> null
-                }
+                val width = (widget as? AppWidget)?.config?.width?.takeIf { it > 0 }
                 val isLast = i == widgets.lastIndex
                 WidgetItem(
                     widget = widget,
                     editMode = editMode,
                     isInRow = true,
                     parentId = targetParentId,
-                    modifier = (if (width != null && width > 0 && !isLast) Modifier.width(width.dp) else Modifier.weight(1f))
-                        .fillMaxHeight()
-                        .padding(start = if (i > 0) 8.dp else 0.dp),
+                    modifier = (if (width != null && !isLast) Modifier.width(width.dp) else Modifier.weight(1f))
+                        .fillMaxHeight(),
                     onMoveLeft = {
                         if (i > 0) viewModel.moveUp(i)
                     },
@@ -75,6 +62,9 @@ fun WidgetRow(
                     },
                     onWidgetUpdate = {
                         viewModel.updateWidget(it)
+                    },
+                    onAddToRow = { newWidget ->
+                        viewModel.combineIntoRow(widget, newWidget)
                     }
                 )
             }

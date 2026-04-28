@@ -104,10 +104,7 @@ import java.text.SimpleDateFormat
 import kotlin.math.roundToInt
 
 @Composable
-fun WeatherWidget(
-    widget: WeatherWidget,
-    modifier: Modifier = Modifier,
-) {
+fun WeatherWidget(widget: WeatherWidget) {
     val viewModel: WeatherWidgetVM = viewModel(key = "weather-widget-${widget.id}")
 
     val context = LocalContext.current
@@ -136,7 +133,7 @@ fun WeatherWidget(
     )
 
 
-    Column(modifier = modifier) {
+    Column {
         if (!isProviderAvailable) {
             Banner(
                 modifier = Modifier

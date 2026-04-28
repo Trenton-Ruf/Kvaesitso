@@ -31,57 +31,72 @@ class WidgetsVM(
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(), emptyList())
 
     fun addWidget(widget: Widget, index: Int? = null) {
-        val widgets = widgets.value.toMutableList()
-        if (index == null) {
-            widgets.add(widget)
-        } else {
-            widgets.add(index.coerceAtMost(widgets.size), widget)
+        viewModelScope.launch {
+            val widgets = widgets.value.toMutableList()
+            if (index == null) {
+                widgets.add(widget)
+            } else {
+                widgets.add(index.coerceAtMost(widgets.size), widget)
+            }
+            widgetRepository.set(widgets, parentId)
         }
-        widgetRepository.set(widgets, parentId)
     }
 
     fun removeWidget(widget: Widget) {
-        widgetRepository.delete(widget)
+        viewModelScope.launch {
+            widgetRepository.delete(widget)
+        }
     }
 
     fun updateWidget(widget: Widget) {
-        widgetRepository.update(widget)
+        viewModelScope.launch {
+            widgetRepository.update(widget)
+        }
     }
 
     fun moveUp(index: Int) {
-        val widgets = widgets.value.toMutableList()
-        val widget = widgets.removeAt(index)
-        widgets.add(index - 1, widget)
-        widgetRepository.set(widgets, parentId)
+        viewModelScope.launch {
+            val widgets = widgets.value.toMutableList()
+            val widget = widgets.removeAt(index)
+            widgets.add(index - 1, widget)
+            widgetRepository.set(widgets, parentId)
+        }
     }
 
     fun moveDown(index: Int) {
-        val widgets = widgets.value.toMutableList()
-        val widget = widgets.removeAt(index)
-        widgets.add(index + 1, widget)
-        widgetRepository.set(widgets, parentId)
+        viewModelScope.launch {
+            val widgets = widgets.value.toMutableList()
+            val widget = widgets.removeAt(index)
+            widgets.add(index + 1, widget)
+            widgetRepository.set(widgets, parentId)
+        }
     }
 
     fun combineIntoRow(originalWidget: Widget, newWidget: Widget) {
-        if (originalWidget is RowWidget) {
-            viewModelScope.launch {
-                val children = widgetRepository.get(parent = originalWidget.id).first()
-                widgetRepository.set(children + newWidget, originalWidget.id)
-            }
+        if (originalWidget.isProtected || newWidget.isProtected) {
             return
         }
-        val widgets = widgets.value.toMutableList()
-        val index = widgets.indexOfFirst { it.id == originalWidget.id }
-        if (index == -1) return
+        viewModelScope.launch {
+            if (originalWidget is RowWidget) {
+                val children = widgetRepository.get(parent = originalWidget.id).first()
+                widgetRepository.set(children + newWidget, originalWidget.id)
+                return@launch
+            }
+            val currentWidgets = widgets.value.toMutableList()
+            val index = currentWidgets.indexOfFirst { it.id == originalWidget.id }
+            if (index == -1) return@launch
 
-        val rowWidget = RowWidget(UUID.randomUUID())
-        widgets[index] = rowWidget
-        widgetRepository.set(widgets, parentId)
-        widgetRepository.set(listOf(originalWidget, newWidget), rowWidget.id)
+            val rowWidget = RowWidget(UUID.randomUUID())
+            currentWidgets[index] = rowWidget
+            widgetRepository.set(currentWidgets, parentId)
+            widgetRepository.set(listOf(originalWidget, newWidget), rowWidget.id)
+        }
     }
 
     fun removeFromRow(widget: Widget, rowId: UUID, targetParentId: UUID?) {
-        widgetRepository.moveOutOfRow(widget, rowId, targetParentId)
+        viewModelScope.launch {
+            widgetRepository.moveOutOfRow(widget, rowId, targetParentId)
+        }
     }
 
     companion object : KoinComponent {

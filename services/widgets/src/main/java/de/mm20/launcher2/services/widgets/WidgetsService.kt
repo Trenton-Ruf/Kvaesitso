@@ -73,11 +73,11 @@ class WidgetsService(
         )
     }
 
-    fun addWidget(widget: Widget, position: Int, parentId: UUID? = null) {
+    suspend fun addWidget(widget: Widget, position: Int, parentId: UUID? = null) {
         widgetRepository.create(widget, position, parentId)
     }
 
-    fun updateWidget(widget: Widget) {
+    suspend fun updateWidget(widget: Widget) {
         widgetRepository.update(widget)
     }
 
@@ -91,7 +91,7 @@ class WidgetsService(
 
     fun countWidgets(type: String) = widgetRepository.count(type)
 
-    fun removeWidget(widget: Widget) {
+    suspend fun removeWidget(widget: Widget) {
         widgetRepository.delete(widget)
     }
 

@@ -28,6 +28,8 @@ data class AppWidget(
     val config: AppWidgetConfig,
 ) : Widget() {
 
+    override val isProtected: Boolean = false
+
     override fun toDatabaseEntity(): PartialWidgetEntity {
         return PartialWidgetEntity(
             id = id,

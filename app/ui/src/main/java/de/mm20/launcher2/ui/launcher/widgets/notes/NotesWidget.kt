@@ -74,7 +74,6 @@ import java.util.UUID
 fun NotesWidget(
     widget: NotesWidget,
     onWidgetAdd: (widget: Widget, offset: Int) -> Unit,
-    modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
     val snackbarHostState = LocalSnackbarHostState.current
@@ -139,7 +138,7 @@ fun NotesWidget(
         )
         return
     }
-    Column(modifier = modifier) {
+    Column {
         Row(
             verticalAlignment = Alignment.CenterVertically,
             modifier = Modifier

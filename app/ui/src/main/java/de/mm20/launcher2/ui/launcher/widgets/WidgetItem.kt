@@ -10,7 +10,6 @@ import androidx.compose.foundation.gestures.Orientation
 import androidx.compose.foundation.gestures.draggable
 import androidx.compose.foundation.gestures.rememberDraggableState
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -18,10 +17,9 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
-import androidx.compose.foundation.layout.offset
-import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.Icon
@@ -53,12 +51,6 @@ import de.mm20.launcher2.ui.component.dragndrop.LazyDragAndDropColumn
 import de.mm20.launcher2.ui.component.dragndrop.rememberLazyDragAndDropListState
 import de.mm20.launcher2.ui.launcher.sheets.ConfigureWidgetSheet
 import de.mm20.launcher2.ui.launcher.sheets.WidgetPickerSheet
-import de.mm20.launcher2.ui.launcher.widgets.calendar.CalendarWidget
-import de.mm20.launcher2.ui.launcher.widgets.external.AppWidget
-import de.mm20.launcher2.ui.launcher.widgets.favorites.AppsWidget
-import de.mm20.launcher2.ui.launcher.widgets.music.MusicWidget
-import de.mm20.launcher2.ui.launcher.widgets.notes.NotesWidget
-import de.mm20.launcher2.ui.launcher.widgets.weather.WeatherWidget
 import de.mm20.launcher2.ui.theme.transparency.transparency
 import de.mm20.launcher2.widgets.AppWidget
 import de.mm20.launcher2.widgets.CalendarWidget
@@ -100,26 +92,7 @@ fun WidgetItem(
         label = "widgetCardBackgroundOpacity",
     )
 
-    val configuredHeight = when (widget) {
-        is AppWidget -> widget.config.height
-        is WeatherWidget -> widget.config.height
-        is MusicWidget -> widget.config.height
-        is CalendarWidget -> widget.config.height
-        is AppsWidget -> widget.config.height
-        is NotesWidget -> widget.config.height
-        is RowWidget -> widget.config.height
-        else -> null
-    }
-
-    val configuredWidth = when (widget) {
-        is AppWidget -> widget.config.width
-        is WeatherWidget -> widget.config.width
-        is MusicWidget -> widget.config.width
-        is CalendarWidget -> widget.config.width
-        is AppsWidget -> widget.config.width
-        is NotesWidget -> widget.config.width
-        else -> null
-    }
+    val customWidth = (widget as? AppWidget)?.config?.width?.takeIf { it > 0 }
 
     if (isInRow) {
         Column(
@@ -157,13 +130,15 @@ fun WidgetItem(
                             contentDescription = stringResource(R.string.menu_ungroup)
                         )
                     }
-                    IconButton(onClick = {
-                        addNewWidgetToRow = true
-                    }) {
-                        Icon(
-                            painterResource(R.drawable.splitscreen_right_20px),
-                            contentDescription = stringResource(R.string.widget_action_add_to_row)
-                        )
+                    if (widget is AppWidget) {
+                        IconButton(onClick = {
+                            addNewWidgetToRow = true
+                        }) {
+                            Icon(
+                                painterResource(R.drawable.splitscreen_right_20px),
+                                contentDescription = stringResource(R.string.widget_action_add_to_row)
+                            )
+                        }
                     }
                     IconButton(onClick = { onWidgetRemove() }) {
                         Icon(
@@ -185,31 +160,30 @@ fun WidgetItem(
                     }
 
                     is WeatherWidget -> {
-                        WeatherWidget(widget, modifier = Modifier.fillMaxSize())
+                        de.mm20.launcher2.ui.launcher.widgets.weather.WeatherWidget(widget)
                     }
 
                     is MusicWidget -> {
-                        MusicWidget(widget, modifier = Modifier.fillMaxSize())
+                        de.mm20.launcher2.ui.launcher.widgets.music.MusicWidget(widget)
                     }
 
                     is CalendarWidget -> {
-                        CalendarWidget(widget, modifier = Modifier.fillMaxSize())
+                        de.mm20.launcher2.ui.launcher.widgets.calendar.CalendarWidget(widget)
                     }
 
                     is AppsWidget -> {
-                        AppsWidget(widget, modifier = Modifier.fillMaxSize())
+                        de.mm20.launcher2.ui.launcher.widgets.favorites.AppsWidget(widget)
                     }
 
                     is NotesWidget -> {
-                        NotesWidget(
+                        de.mm20.launcher2.ui.launcher.widgets.notes.NotesWidget(
                             widget,
                             onWidgetAdd = onWidgetAdd,
-                            modifier = Modifier.fillMaxSize(),
                         )
                     }
 
                     is AppWidget -> {
-                        AppWidget(
+                        de.mm20.launcher2.ui.launcher.widgets.external.AppWidget(
                             widget,
                             onWidgetUpdate = onWidgetUpdate,
                             onWidgetRemove = onWidgetRemove,
@@ -219,183 +193,203 @@ fun WidgetItem(
                 }
             }
         }
-
-        return
-    }
-
-    LauncherCard(
-        modifier = modifier
-            .zIndex(if (isDragged) 1f else 0f)
-            .then(if (configuredWidth != null && configuredWidth > 0 && !editMode) Modifier.width(configuredWidth.dp) else Modifier)
-            .then(if (configuredHeight != null && !editMode) Modifier.height(configuredHeight.dp) else Modifier),
-        elevation = elevation,
-        backgroundOpacity = backgroundOpacity,
-    ) {
-        Column(modifier = if (editMode) Modifier.wrapContentHeight() else Modifier.fillMaxHeight()) {
-            AnimatedVisibility(editMode) {
-                Row(
-                    modifier = Modifier.padding(8.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Icon(
-                        painterResource(R.drawable.drag_indicator_24px),
-                        contentDescription = null,
-                        modifier = Modifier.draggable(
-                            state = draggableState,
-                            orientation = Orientation.Vertical,
-                            startDragImmediately = true,
-                            onDragStarted = {
-                                isDragged = true
-                            },
-                            onDragStopped = {
-                                isDragged = false
-                                onDragStopped()
+    } else {
+        LauncherCard(
+            modifier = modifier
+                .zIndex(if (isDragged) 1f else 0f),
+            elevation = elevation,
+            backgroundOpacity = backgroundOpacity,
+        ) {
+            Column(
+                modifier = (if (editMode) Modifier.wrapContentHeight() else Modifier)
+                    .fillMaxWidth()
+            ) {
+                AnimatedVisibility(editMode) {
+                    Row(
+                        modifier = Modifier.padding(8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            painterResource(R.drawable.drag_indicator_24px),
+                            contentDescription = null,
+                            modifier = Modifier.draggable(
+                                state = draggableState,
+                                orientation = Orientation.Vertical,
+                                startDragImmediately = true,
+                                onDragStarted = {
+                                    isDragged = true
+                                },
+                                onDragStopped = {
+                                    isDragged = false
+                                    onDragStopped()
+                                }
+                            )
+                        )
+                        Text(
+                            text = widget.getLabel(LocalContext.current),
+                            style = MaterialTheme.typography.titleMedium,
+                            modifier = Modifier
+                                .weight(1f)
+                                .padding(horizontal = 8.dp),
+                            overflow = TextOverflow.Ellipsis,
+                            maxLines = 1
+                        )
+                        if (!widget.isProtected) {
+                            IconButton(onClick = {
+                                addNewWidgetToRow = true
+                            }) {
+                                Icon(
+                                    painterResource(R.drawable.splitscreen_right_20px),
+                                    contentDescription = stringResource(R.string.widget_action_add_to_row)
+                                )
                             }
-                        )
-                    )
-                    Text(
-                        text = widget.getLabel(LocalContext.current),
-                        style = MaterialTheme.typography.titleMedium,
-                        modifier = Modifier
-                            .weight(1f)
-                            .padding(horizontal = 8.dp),
-                        overflow = TextOverflow.Ellipsis,
-                        maxLines = 1
-                    )
-                    IconButton(onClick = {
-                        addNewWidgetToRow = true
-                    }) {
-                        Icon(
-                            painterResource(R.drawable.splitscreen_right_20px),
-                            contentDescription = stringResource(R.string.widget_action_add_to_row)
-                        )
-                    }
-                    IconButton(onClick = {
-                        configure = true
-                    }) {
-                        Icon(
-                            painterResource(R.drawable.tune_24px),
-                            contentDescription = stringResource(R.string.settings)
-                        )
-                    }
-                    IconButton(onClick = { onWidgetRemove() }) {
-                        Icon(
-                            painterResource(R.drawable.delete_24px),
-                            contentDescription = stringResource(R.string.widget_action_remove)
-                        )
+                        }
+                        IconButton(onClick = {
+                            configure = true
+                        }) {
+                            Icon(
+                                painterResource(R.drawable.tune_24px),
+                                contentDescription = stringResource(R.string.settings)
+                            )
+                        }
+                        IconButton(onClick = { onWidgetRemove() }) {
+                            Icon(
+                                painterResource(R.drawable.delete_24px),
+                                contentDescription = stringResource(R.string.widget_action_remove)
+                            )
+                        }
                     }
                 }
-            }
-            AnimatedVisibility(!editMode || widget is RowWidget, modifier = if (editMode) Modifier else Modifier.weight(1f)) {
-                if (editMode && widget is RowWidget) {
-                    val childViewModel: WidgetsVM = viewModel(
-                        key = "widgets-row-edit-${widget.id}",
-                        factory = WidgetsVM.Factory(widget.id.toString()),
-                    )
-                    val children by childViewModel.widgets.collectAsState()
-                    val dragAndDropState = rememberLazyDragAndDropListState(
-                        onItemMove = { from, to ->
-                            if (from.index < to.index) {
-                                childViewModel.moveDown(from.index)
-                            } else {
-                                childViewModel.moveUp(from.index)
+                AnimatedVisibility(!editMode || widget is RowWidget, modifier = if (editMode && widget is RowWidget) Modifier else Modifier.fillMaxWidth()) {
+                    if (editMode && widget is RowWidget) {
+                        val childViewModel: WidgetsVM = viewModel(
+                            key = "widgets-row-edit-${widget.id}",
+                            factory = WidgetsVM.Factory(widget.id.toString()),
+                        )
+                        val children by childViewModel.widgets.collectAsState()
+                        val dragAndDropState = rememberLazyDragAndDropListState(
+                            onItemMove = { from, to ->
+                                if (from.index < to.index) {
+                                    childViewModel.moveDown(from.index)
+                                } else {
+                                    childViewModel.moveUp(from.index)
+                                }
                             }
-                        }
-                    )
+                        )
 
-                    LazyDragAndDropColumn(
-                        state = dragAndDropState,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .heightIn(max = 2000.dp) // Large enough to typically avoid internal scrolling
-                            .padding(horizontal = 8.dp, vertical = 4.dp),
-                        bidirectionalDrag = false
-                    ) {
-                        items(children, key = { it.id }) { child ->
-                            DraggableItem(state = dragAndDropState, key = child.id) {
-                                Surface(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
-                                    shape = MaterialTheme.shapes.small
-                                ) {
-                                    Row(
-                                        modifier = Modifier.padding(8.dp),
-                                        verticalAlignment = Alignment.CenterVertically
+                        LazyDragAndDropColumn(
+                            state = dragAndDropState,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .heightIn(max = 2000.dp) // Large enough to typically avoid internal scrolling
+                                .padding(horizontal = 8.dp, vertical = 4.dp),
+                            bidirectionalDrag = false
+                        ) {
+                            items(children, key = { it.id }) { child ->
+                                DraggableItem(state = dragAndDropState, key = child.id) {
+                                    Surface(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                                        shape = MaterialTheme.shapes.small
                                     ) {
-                                        Icon(
-                                            painterResource(R.drawable.drag_indicator_24px),
-                                            contentDescription = null,
-                                            modifier = Modifier.padding(end = 8.dp)
-                                        )
-                                        Text(
-                                            text = child.getLabel(LocalContext.current),
-                                            style = MaterialTheme.typography.bodyMedium,
-                                            modifier = Modifier.weight(1f)
-                                        )
-                                        IconButton(onClick = {
-                                            childViewModel.removeFromRow(child, widget.id, parentId)
-                                        }) {
+                                        Row(
+                                            modifier = Modifier.padding(8.dp),
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
                                             Icon(
-                                                painterResource(R.drawable.unarchive_24px),
-                                                contentDescription = stringResource(R.string.menu_ungroup)
+                                                painterResource(R.drawable.drag_indicator_24px),
+                                                contentDescription = null,
+                                                modifier = Modifier.padding(end = 8.dp)
                                             )
-                                        }
-                                        IconButton(onClick = {
-                                            childViewModel.removeWidget(child)
-                                        }) {
-                                            Icon(
-                                                painterResource(R.drawable.delete_24px),
-                                                contentDescription = stringResource(R.string.widget_action_remove)
+                                            Text(
+                                                text = child.getLabel(LocalContext.current),
+                                                style = MaterialTheme.typography.bodyMedium,
+                                                modifier = Modifier.weight(1f)
                                             )
+                                            if (!child.isProtected) {
+                                                IconButton(onClick = {
+                                                    addNewWidgetToRow = true
+                                                }) {
+                                                    Icon(
+                                                        painterResource(R.drawable.splitscreen_right_20px),
+                                                        contentDescription = stringResource(R.string.widget_action_add_to_row)
+                                                    )
+                                                }
+                                            }
+                                            IconButton(onClick = {
+                                                childViewModel.removeFromRow(child, widget.id, parentId)
+                                            }) {
+                                                Icon(
+                                                    painterResource(R.drawable.unarchive_24px),
+                                                    contentDescription = stringResource(R.string.menu_ungroup)
+                                                )
+                                            }
+                                            IconButton(onClick = {
+                                                childViewModel.removeWidget(child)
+                                            }) {
+                                                Icon(
+                                                    painterResource(R.drawable.delete_24px),
+                                                    contentDescription = stringResource(R.string.widget_action_remove)
+                                                )
+                                            }
                                         }
                                     }
+                                    Spacer(modifier = Modifier.height(4.dp))
                                 }
-                                Spacer(modifier = Modifier.height(4.dp))
                             }
                         }
-                    }
-                } else {
-                    when (widget) {
-                        is RowWidget -> {
-                            WidgetRow(
-                                editMode = editMode,
-                                parentId = widget.id,
-                                targetParentId = parentId,
-                                height = widget.config.height,
-                            )
-                        }
+                    } else {
+                        when (widget) {
+                            is RowWidget -> {
+                                WidgetRow(
+                                    editMode = editMode,
+                                    parentId = widget.id,
+                                    targetParentId = parentId,
+                                    height = widget.config.height,
+                                )
+                            }
 
-                        is WeatherWidget -> {
-                            WeatherWidget(widget, modifier = Modifier.fillMaxSize())
-                        }
+                            is WeatherWidget -> {
+                                de.mm20.launcher2.ui.launcher.widgets.weather.WeatherWidget(widget)
+                            }
 
-                        is MusicWidget -> {
-                            MusicWidget(widget, modifier = Modifier.fillMaxSize())
-                        }
+                            is MusicWidget -> {
+                                de.mm20.launcher2.ui.launcher.widgets.music.MusicWidget(widget)
+                            }
 
-                        is CalendarWidget -> {
-                            CalendarWidget(widget, modifier = Modifier.fillMaxSize())
-                        }
+                            is CalendarWidget -> {
+                                de.mm20.launcher2.ui.launcher.widgets.calendar.CalendarWidget(widget)
+                            }
 
-                        is AppsWidget -> {
-                            AppsWidget(widget, modifier = Modifier.fillMaxSize())
-                        }
+                            is AppsWidget -> {
+                                de.mm20.launcher2.ui.launcher.widgets.favorites.AppsWidget(widget)
+                            }
 
-                        is NotesWidget -> {
-                            NotesWidget(
-                                widget,
-                                onWidgetAdd = onWidgetAdd,
-                                modifier = Modifier.fillMaxSize(),
-                            )
-                        }
+                            is NotesWidget -> {
+                                de.mm20.launcher2.ui.launcher.widgets.notes.NotesWidget(
+                                    widget,
+                                    onWidgetAdd = onWidgetAdd,
+                                )
+                            }
 
-                        is AppWidget -> {
-                            AppWidget(
-                                widget,
-                                onWidgetUpdate = onWidgetUpdate,
-                                onWidgetRemove = onWidgetRemove,
-                                modifier = Modifier.fillMaxSize(),
-                            )
+                            is AppWidget -> {
+                                Box(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    de.mm20.launcher2.ui.launcher.widgets.external.AppWidget(
+                                        widget,
+                                        onWidgetUpdate = onWidgetUpdate,
+                                        onWidgetRemove = onWidgetRemove,
+                                        modifier = Modifier
+                                            .then(
+                                                if (customWidth != null) Modifier.width(customWidth.dp)
+                                                else Modifier.fillMaxWidth()
+                                            )
+                                            .height(widget.config.height.dp),
+                                    )
+                                }
+                            }
                         }
                     }
                 }
@@ -405,11 +399,13 @@ fun WidgetItem(
     ConfigureWidgetSheet(
         expanded = configure,
         widget = widget,
+        isInRow = isInRow,
         onWidgetUpdated = onWidgetUpdate,
         onDismiss = { configure = false },
     )
     WidgetPickerSheet(
         expanded = addNewWidgetToRow,
+        includeBuiltinWidgets = false,
         onDismiss = { addNewWidgetToRow = false },
         onWidgetSelected = {
             onAddToRow(it)

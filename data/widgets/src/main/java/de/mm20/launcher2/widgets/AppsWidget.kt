@@ -13,8 +13,6 @@ data class FavoritesWidgetConfig(
     val tagsMultiline: Boolean = false,
     val compactTags: Boolean = false,
     val tagList: List<String> = emptyList(),
-    val height: Int? = null,
-    val width: Int? = null,
 )
 
 data class AppsWidget(
