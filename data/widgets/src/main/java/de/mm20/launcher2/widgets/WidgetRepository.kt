@@ -93,10 +93,7 @@ internal class WidgetRepositoryImpl(
 
             // Move the widget to the target parent at the row's position
             val entity = widget.toDatabaseEntity(position = rowPosition, parentId = targetParentId)
-            dao.insert(entity)
-
-            // Delete the widget from the row
-            dao.delete(widget.id)
+            dao.update(entity)
 
             // Check if the row is now empty or has only one widget
             val remainingCount = dao.countByParent(rowId)
@@ -107,8 +104,7 @@ internal class WidgetRepositoryImpl(
                     if (lastWidget != null) {
                         // Move last widget to position after the one we just moved
                         val lastWidgetTargetEntity = lastWidget.toDatabaseEntity(position = rowPosition + 1, parentId = targetParentId)
-                        dao.insert(lastWidgetTargetEntity)
-                        dao.delete(lastWidget.id)
+                        dao.update(lastWidgetTargetEntity)
                     }
                 }
                 dao.delete(rowId)

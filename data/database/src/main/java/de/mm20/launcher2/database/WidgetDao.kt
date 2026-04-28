@@ -5,6 +5,7 @@ import androidx.room.Delete
 import androidx.room.Insert
 import androidx.room.Query
 import androidx.room.Update
+import androidx.room.OnConflictStrategy
 import de.mm20.launcher2.database.entities.WidgetEntity
 import de.mm20.launcher2.database.entities.PartialWidgetEntity
 import kotlinx.coroutines.flow.Flow
@@ -33,10 +34,10 @@ interface WidgetDao {
     @Query("UPDATE Widget SET position = position + :delta WHERE parentId = :parentId AND position >= :startPosition")
     suspend fun shiftByParent(parentId: UUID, startPosition: Int, delta: Int)
 
-    @Insert
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insert(widget: WidgetEntity)
 
-    @Insert
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insert(widgets: List<WidgetEntity>)
 
     @Update(entity = WidgetEntity::class)
